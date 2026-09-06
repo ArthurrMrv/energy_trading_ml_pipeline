@@ -14,3 +14,7 @@ runs/
 .DS_Store
 .coverage
 .pytest_cache/
+
+# bronze and silver datasets
+backend/data/bronze/*
+backend/data/silver/*

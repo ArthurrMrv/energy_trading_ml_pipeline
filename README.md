@@ -9,10 +9,7 @@ collect → prepare → fit │ simulate → evaluate
 └──── your Strategy ────┘└── pipeline-owned ──┘
 ```
 
-You write `collect`, `prepare`, and optional `fit`. `on_tick` is called from
-`simulate`: the engine fills, tracks inventory, and marks PnL. Each stage is a
-subprocess with a checkpoint, so a broken stage can be resumed without
-recomputing the ones before it.
+You write `collect`, `prepare`, and optional `fit`. `on_tick` is called from `simulate`: the engine fills, tracks inventory, and marks PnL. Each stage is a subprocess with a checkpoint, so a broken stage can be resumed without recomputing the ones before it.
 
 ## Quickstart
 
@@ -47,22 +44,14 @@ class MyStrategy(Strategy):
         ...                                      # -> asset, qty, optional delta
 ```
 
-`prepare` must include `ts, asset, price`. Optional `volume` caps the fill
-(absent = full fill). Optional `fee_bps` / `slippage_bps` / `*_per_unit` price
-execution per row. Extra columns are features on the `on_tick` snapshot.
+`prepare` must include `ts, asset, price`. Optional `volume` caps the fill (absent = full fill). Optional `fee_bps` / `slippage_bps` / `*_per_unit` price execution per row. Extra columns are features on the `on_tick` snapshot.
 
-`on_tick` sees filled inventory (a copy) and returns signed trades. Unfilled
-remainder is dropped. `delta` is the unit greek (default 1); portfolio delta is
-`sum(inventory * delta)`.
+`on_tick` sees filled inventory (a copy) and returns signed trades. Unfilled remainder is dropped. `delta` is the unit greek (default 1); portfolio delta is `sum(inventory * delta)`.
 
-- **`fit` returns the model** — stages are separate processes; `self` does not
-  survive between them. Tick-local state is allowed inside `simulate`.
-- **Previous inventory earns this tick's price change; this tick's fill starts
-  earning next tick.** `prepare` still lags features (DA noon rule).
+- **`fit` returns the model** — stages are separate processes; `self` does not survive between them. Tick-local state is allowed inside `simulate`.
+- **Previous inventory earns this tick's price change; this tick's fill start earning next tick.** `prepare` still lags features (DA noon rule).
 
-`backend/strategies/spread_meanrev_toFix.py` is a working example. Use
-`return_mode: "diff"` for power: prices go negative and a percentage return is
-undefined.
+`backend/strategies/spread_meanrev_toFix.py` is here to showcase Agent debugging assistance. Use `return_mode: "diff"` for power: prices go negative and a percentage return is undefined.
 
 ## Config
 
@@ -77,16 +66,13 @@ undefined.
 | `periods_per_year` | `365` | Annualization. |
 | `stage_timeout_s` | `900` | Per-stage wall clock. |
 
-A column on the panel beats the config. Negative costs are refused. Anything
-else in `config` is the strategy's.
+A column on the panel beats the config. Negative costs are refused. Anything else in `config` is the strategy's.
 
-Permutation `p_value` is `(1 + beaten) / (n + 1)`. Paths live in
-`permutation.json`. Split sessions land in `split.json` / `sessions.json`.
+Permutation `p_value` is `(1 + beaten) / (n + 1)`. Paths live in `permutation.json`. Split sessions land in `split.json` / `sessions.json`.
 
 ## When a stage breaks
 
-The run is **`paused`**, not `failed`. Context (source, config, traceback,
-inputs, logs):
+The run is **`paused`**, not `failed`. Context (source, config, traceback, inputs, logs):
 
 ```bash
 curl -s localhost:8000/runs/<run_id>/steps/prepare/context
@@ -101,8 +87,7 @@ curl -s -X POST localhost:8000/runs/<run_id>/resume -H 'content-type: applicatio
 
 Attach VS Code (*Python: Remote Attach*) to the reported `debug_port`.
 
-Delete a run or strategy by removing its files: `rm -rf runs/<run_id>`,
-`rm runs/strategies/<id>.py`. SQLite reconciles on the next listing.
+Delete a run or strategy by removing its files: `rm -rf runs/<run_id>`, `rm runs/strategies/<id>.py`. SQLite reconciles on the next listing.
 
 ## API
 
@@ -118,8 +103,7 @@ Delete a run or strategy by removing its files: `rm -rf runs/<run_id>`,
 | `GET /runs/{id}/artifacts/{name}` | download a checkpoint |
 | `GET`/`WS /runs/{id}/events` | history, then live tail |
 
-UI at `/`, docs at `/docs`. Uploaded code runs with your local privileges —
-isolation, not a security boundary.
+UI at `/`, docs at `/docs`. Uploaded code runs with your local privileges — isolation, not a security boundary.
 
 ```bash
 uv run pytest --cov=backend/pipeline
