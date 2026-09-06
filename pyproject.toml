@@ -1,0 +1,39 @@
+[project]
+name = "pipeline-engie"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "debugpy>=1.8.21",
+    "fastapi>=0.141.1",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.5",
+    "polars>=1.44.1",
+    "pyarrow>=25.0.1",
+    "python-multipart>=0.0.32",
+    "scikit-learn>=1.9.0",
+    "tqdm>=4.70.0",
+    "uvicorn[standard]>=0.52.4",
+    "websockets>=17.1",
+    "xgboost>=3.4.1",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+filterwarnings = [
+    "error::DeprecationWarning:backend.*",
+    # A leaked sqlite handle per store call would exhaust file descriptors.
+    "error::ResourceWarning",
+    # Third-party deprecations we cannot act on; kept narrow so ours still surface.
+    "ignore:Using `httpx` with `starlette.testclient`:UserWarning",
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning",
+]
