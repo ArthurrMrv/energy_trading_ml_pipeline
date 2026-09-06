@@ -1,12 +1,13 @@
 [project]
 name = "pipeline-engie"
 version = "0.1.0"
-description = "Add your description here"
+description = "Stage-by-stage research pipeline for backtesting uploaded trading strategies"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "debugpy>=1.8.21",
     "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "openpyxl>=3.1.5",
     "pandas>=3.0.5",
     "polars>=1.44.1",
@@ -21,7 +22,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
 ]

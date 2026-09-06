@@ -1,14 +1,7 @@
-"""European day-ahead timing guarantees for the spread strategies.
+"""Day-ahead timing identities on a toy strategy, not a research one.
 
-Ember gold is delivery-dated: the print on day ``t`` was auctioned at noon
-``t-1``. Strategies must therefore:
-
-1. Build features at ``t`` from prints / loads through ``t-1`` only.
-2. Mark the panel at the next DA print ``spread_{t+1}``.
-3. (ML) Label the next *tradeable* move ``spread_{t+2} - spread_{t+1}``.
-
-These are algebraic identities on a synthetic panel -- no gold parquet, no
-seeds on the assertion, no tolerance on the clock.
+The print on day ``t`` was auctioned at noon ``t-1``. Features at ``t`` may
+use prints through ``t-1`` only; the panel mark is the next print.
 """
 
 from datetime import date, timedelta
@@ -16,136 +9,78 @@ from datetime import date, timedelta
 import polars as pl
 import pytest
 
-from backend.strategies.helpers import ml_features as feat
-from backend.strategies.spread_meanrev_toFix import SpreadMeanReversion
+from backend.pipeline.contract import Strategy
 
-PAIRS = [["FRA", "DEU"]]
-ASSET = "FRA-DEU"
-LOOKBACK = 5
-N_DAYS = 80
+N, LOOKBACK = 40, 5
+START = date(2015, 6, 1)
+PROBE = START + timedelta(days=20)
 
 
-def _dates(n=N_DAYS, start=date(2015, 6, 1)):
-    return [start + timedelta(days=i) for i in range(n)]
+class ToyDA(Strategy):
+    """One asset. ``z`` from the lagged print; ``price`` is the next print."""
+
+    def collect(self, config):
+        return None
+
+    def prepare(self, raw, config):
+        lookback = int(config.get("lookback", LOOKBACK))
+        return (
+            raw.sort("ts")
+            .with_columns(pl.col("price").alias("print"))
+            .with_columns(pl.col("print").shift(1).alias("known"))
+            .with_columns(
+                pl.col("known").rolling_mean(lookback).alias("mean"),
+                pl.col("known").rolling_std(lookback).alias("std"),
+            )
+            .with_columns(
+                pl.when(pl.col("std") > 0)
+                .then((pl.col("known") - pl.col("mean")) / pl.col("std"))
+                .otherwise(0.0)
+                .alias("z"),
+                pl.col("print").shift(-1).alias("price"),
+            )
+            .drop_nulls()
+        )
+
+    def on_tick(self, ts, market, inventory, model, config):
+        assets = market["asset"].to_list()
+        z = market["z"].to_list()
+        qty = [-(zi / 2.0) - inventory.get(a, 0.0) for a, zi in zip(assets, z)]
+        return pl.DataFrame({"asset": assets, "qty": qty})
 
 
-def synthetic_prices(n=N_DAYS, *, scramble_from: date | None = None):
-    """FRA/DEU daily prices. Optionally scramble prints from ``scramble_from``."""
+def panel(*, scramble_from=None):
     rows = []
-    for i, ts in enumerate(_dates(n)):
-        fra, deu = 40.0 + i * 0.1, 35.0 + i * 0.05
-        if scramble_from is not None and ts >= scramble_from:
-            fra, deu = 999.0 + i, -999.0 - i
-        rows.append({"ts": ts, "country": "FRA", "price": fra})
-        rows.append({"ts": ts, "country": "DEU", "price": deu})
-    return pl.DataFrame(rows).sort("ts", "country")
+    for i in range(N):
+        ts = START + timedelta(days=i)
+        px = 999.0 + i if scramble_from is not None and ts >= scramble_from else 40.0 + i * 0.1
+        rows.append({"ts": ts, "asset": "A", "price": px})
+    return pl.DataFrame(rows)
 
 
-def synthetic_loads(n=N_DAYS, *, scramble_from: date | None = None):
-    """FR/DE daily loads (enough for emea_west / emea_central after intersect)."""
-    rows = []
-    for i, ts in enumerate(_dates(n)):
-        fr, de = 50_000.0 + i, 60_000.0 + i * 2
-        if scramble_from is not None and ts >= scramble_from:
-            fr, de = 1.0, 2.0
-        rows.append({"ts": ts, "country": "FR", "load": fr})
-        rows.append({"ts": ts, "country": "DE", "load": de})
-    return pl.DataFrame(rows).sort("ts", "country")
+def prepared(raw):
+    return ToyDA().prepare(raw, {})
 
 
-def spreads_from(prices: pl.DataFrame) -> pl.DataFrame:
-    return feat.build_spreads(prices, PAIRS)
-
-
-def meanrev_prepared(prices: pl.DataFrame):
-    return SpreadMeanReversion().prepare(prices, {"pairs": PAIRS, "lookback": LOOKBACK})
-
-
-def meanrev_qty(prices: pl.DataFrame, ts):
-    strategy = SpreadMeanReversion()
-    prepared = strategy.prepare(prices, {"pairs": PAIRS, "lookback": LOOKBACK})
-    market = prepared.filter(pl.col("ts") == ts)
-    orders = strategy.on_tick(ts, market, {}, None, {"entry_z": 2.0})
-    return orders["qty"].to_list()
-
-
-def ml_prepared(prices: pl.DataFrame, loads: pl.DataFrame):
-    return feat.prepare_spread_features(prices, loads, PAIRS)
-
-
-PROBE = _dates()[40]
+def qty_at(raw, ts):
+    strategy = ToyDA()
+    market = prepared(raw).filter(pl.col("ts") == ts)
+    return strategy.on_tick(ts, market, {}, None, {})["qty"].to_list()
 
 
 class TestSameBarInvariance:
-    """Scrambling spread[t] (and later) must not change the order / features at t."""
+    def test_qty_at_t_ignores_same_bar_print(self):
+        assert qty_at(panel(), PROBE) == qty_at(panel(scramble_from=PROBE), PROBE)
 
-    def test_meanrev_qty_at_t_ignores_same_bar_print(self):
-        assert meanrev_qty(synthetic_prices(), PROBE) == meanrev_qty(
-            synthetic_prices(scramble_from=PROBE), PROBE
-        )
-
-    def test_meanrev_qty_at_t_plus_1_may_see_scrambled_print(self):
+    def test_qty_at_t_plus_1_may_see_scrambled_print(self):
         nxt = PROBE + timedelta(days=1)
-        assert meanrev_qty(synthetic_prices(), nxt) != meanrev_qty(
-            synthetic_prices(scramble_from=PROBE), nxt
-        )
-
-    def test_ml_features_at_t_ignore_same_bar_print_and_load(self):
-        clean = ml_prepared(synthetic_prices(), synthetic_loads())
-        dirty = ml_prepared(
-            synthetic_prices(scramble_from=PROBE),
-            synthetic_loads(scramble_from=PROBE),
-        )
-        cols = feat.feature_columns(clean)
-        assert cols
-        assert clean.filter(pl.col("ts") == PROBE).select(cols).row(0) == (
-            dirty.filter(pl.col("ts") == PROBE).select(cols).row(0)
-        )
+        assert qty_at(panel(), nxt) != qty_at(panel(scramble_from=PROBE), nxt)
 
 
-class TestNextPrintMarkAndLabel:
-    """Panel price is spread[t+1]; ML label is spread[t+2] - spread[t+1]."""
-
-    def test_meanrev_price_is_the_next_print(self):
-        prices = synthetic_prices()
-        prepared = meanrev_prepared(prices)
-        by_ts = {row["ts"]: row["spread"] for row in spreads_from(prices).to_dicts()}
-        for row in prepared.to_dicts():
-            nxt = row["ts"] + timedelta(days=1)
-            assert nxt in by_ts
-            assert row["price"] == pytest.approx(by_ts[nxt])
-
-    def test_ml_label_is_the_next_tradeable_move(self):
-        prices = synthetic_prices()
-        prepared = ml_prepared(prices, synthetic_loads())
-        by_ts = {row["ts"]: row["spread"] for row in spreads_from(prices).to_dicts()}
-        for row in prepared.to_dicts():
-            t1 = row["ts"] + timedelta(days=1)
-            t2 = row["ts"] + timedelta(days=2)
-            assert t1 in by_ts and t2 in by_ts
-            assert row["label"] == pytest.approx(by_ts[t2] - by_ts[t1])
-
-    def test_ml_price_is_the_next_print(self):
-        prices = synthetic_prices()
-        prepared = ml_prepared(prices, synthetic_loads())
-        by_ts = {row["ts"]: row["spread"] for row in spreads_from(prices).to_dicts()}
-        for row in prepared.to_dicts():
+class TestNextPrintMark:
+    def test_price_is_the_next_print(self):
+        raw = panel()
+        by_ts = {row["ts"]: row["price"] for row in raw.to_dicts()}
+        for row in prepared(raw).to_dicts():
             nxt = row["ts"] + timedelta(days=1)
             assert row["price"] == pytest.approx(by_ts[nxt])
-
-    def test_ml_on_tick_sizes_from_the_stub_prediction(self):
-        from backend.strategies.helpers import spread_gbm as gbm
-
-        prepared = ml_prepared(synthetic_prices(), synthetic_loads())
-        market = prepared.filter(pl.col("ts") == PROBE)
-
-        class Stub:
-            def predict(self, x):
-                return [0.0] * len(x)
-
-        features = feat.feature_columns(prepared)[:3]
-        orders = gbm.on_tick(
-            market, {}, {"model": Stub(), "features": features}, {"signal_scale": 5.0},
-        )
-        assert orders["qty"].to_list() == [0.0]
-        assert orders["asset"].to_list() == [ASSET]

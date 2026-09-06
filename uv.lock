@@ -396,6 +396,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "debugpy" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "polars" },
@@ -410,7 +411,6 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -419,6 +419,7 @@ dev = [
 requires-dist = [
     { name = "debugpy", specifier = ">=1.8.21" },
     { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "polars", specifier = ">=1.44.1" },
@@ -433,7 +434,6 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
 ]

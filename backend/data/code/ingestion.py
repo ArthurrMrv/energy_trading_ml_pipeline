@@ -8,6 +8,25 @@ import polars as pl
 
 import shutil
 
+# 2020 flows renamed these; archive files still use the old headers.
+_FLOW_COLUMNS = {
+    "Submitted By": "FromAreaCode",
+    "Border with": "ToAreaCode",
+    "SB Member": "FromAreaMemberType",
+    "BW Member": "ToAreaMemberType",
+}
+
+
+def _align_flow_columns(df: pl.DataFrame) -> pl.DataFrame:
+    for old, new in _FLOW_COLUMNS.items():
+        if old not in df.columns:
+            continue
+        if new in df.columns:
+            df = df.with_columns(pl.coalesce(pl.col(new), pl.col(old)).alias(new)).drop(old)
+        else:
+            df = df.rename({old: new})
+    return df
+
 class Ingestion:
 
     def bronze_to_silver(self):
@@ -25,8 +44,14 @@ class Ingestion:
 
             if name not in silver_dfs:
                 if os.path.isfile(path):
-                    silver_dfs[name] = pl.read_parquet(path)
-                    silver_years[name] = set(silver_dfs[name]['Year'].unique().to_list())
+                    df = pl.read_parquet(path)
+                    if name == DataTemplates.PHYSICAL_ENERGY_POWER_FLOWS and any(
+                        c in df.columns for c in _FLOW_COLUMNS
+                    ):
+                        df = _align_flow_columns(df)
+                        df.write_parquet(path)
+                    silver_dfs[name] = df
+                    silver_years[name] = set(df['Year'].unique().to_list())
                 else:
                     silver_dfs[name] = None
                     silver_years[name] = set()
@@ -40,7 +65,9 @@ class Ingestion:
             if not missing:
                 continue
 
-            bronze = pd.read_excel(bronze_file_path)
+            bronze = pd.concat(pd.read_excel(bronze_file_path, sheet_name=None).values(), ignore_index=True)
+            if name == DataTemplates.PHYSICAL_ENERGY_POWER_FLOWS:
+                bronze = bronze.rename(columns=_FLOW_COLUMNS)
             if name == DataTemplates.MONTHLY_HOURLY_LOAD_VALUES:
                 bronze['Year'] = bronze['DateUTC'].dt.year
             elif 'Year' not in bronze.columns:

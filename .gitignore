@@ -14,7 +14,3 @@ runs/
 .DS_Store
 .coverage
 .pytest_cache/
-
-# any run in runs except strategies 
-runs/
-!runs/strategies/
