@@ -25,16 +25,25 @@ function summarize(step) {
   return parts.join(" · ") || (step.status || "pending");
 }
 
+function pillMarkup(name, state) {
+  const step = state.steps[name] || {};
+  return `<li class="pill" data-stage="${name}"
+    data-status="${esc(step.status || "pending")}"
+    aria-current="${state.selected === name}">
+    <span class="name">${name}</span>
+    <span class="meta">${esc(summarize(step))}</span>
+  </li>`;
+}
+
 function renderStages(state) {
-  el("stages").innerHTML = STAGES.map((name) => {
-    const step = state.steps[name] || {};
-    return `<li class="pill" data-stage="${name}"
-      data-status="${esc(step.status || "pending")}"
-      aria-current="${state.selected === name}">
-      <span class="name">${name}</span>
-      <span class="meta">${esc(summarize(step))}</span>
-    </li>`;
-  }).join("");
+  el("stages").innerHTML = `<ol class="pipeline-steps">${
+    STAGES.flatMap((name, i) => {
+      const pill = pillMarkup(name, state);
+      return i === 0
+        ? [pill]
+        : [`<li class="pipeline-arrow" aria-hidden="true"></li>`, pill];
+    }).join("")
+  }</ol>`;
 }
 
 function renderOptions(node, items, selected, label) {

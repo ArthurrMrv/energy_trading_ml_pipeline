@@ -14,69 +14,75 @@
 
     <p id="banner" class="banner" hidden></p>
 
-    <section class="panel">
-      <h2>Strategy</h2>
+    <div class="layout">
+      <aside class="setup">
+        <section class="panel">
+          <h2>Strategy</h2>
 
-      <div class="row">
-        <input type="file" id="file" accept=".py" />
-        <button id="upload">Upload</button>
-      </div>
+          <div class="row">
+            <input type="file" id="file" accept=".py" />
+            <button id="upload">Upload</button>
+          </div>
 
-      <div class="row">
-        <label for="strategy">strategy</label>
-        <select id="strategy"></select>
-      </div>
+          <div class="row">
+            <label for="strategy">strategy</label>
+            <select id="strategy"></select>
+          </div>
 
-      <div class="row">
-        <label for="deepseek-key">DeepSeek API key</label>
-        <input type="password" id="deepseek-key" placeholder="sk-…" autocomplete="off" />
-        <button type="button" id="save-deepseek">Save</button>
-      </div>
-      <p class="hint">Stored only in this browser. Used to explain stage errors and optionally fix the strategy.</p>
+          <div class="row">
+            <label for="deepseek-key">DeepSeek API key</label>
+            <input type="password" id="deepseek-key" placeholder="sk-…" autocomplete="off" />
+            <button type="button" id="save-deepseek">Save</button>
+          </div>
+          <p class="hint">Stored only in this browser. Used to explain stage errors and optionally fix the strategy.</p>
 
-      <label for="config">config &middot; JSON</label>
-      <textarea id="config" rows="4" spellcheck="false"></textarea>
+          <label for="config">config &middot; JSON</label>
+          <textarea id="config" rows="4" spellcheck="false"></textarea>
 
-      <div class="row">
-        <button id="run" class="primary">Run</button>
-        <label for="past-run" class="muted">or reopen</label>
-        <select id="past-run"></select>
-      </div>
-    </section>
+          <div class="row">
+            <button id="run" class="primary">Run</button>
+            <label for="past-run" class="muted">or reopen</label>
+            <select id="past-run"></select>
+          </div>
+        </section>
+      </aside>
 
-    <section class="panel">
-      <div class="row spread">
-        <h2>Stages</h2>
-        <span id="run-id" class="muted"></span>
-      </div>
-      <ol id="stages" class="stages"></ol>
-      <p class="hint">Click a stage to inspect what it was handed and what it produced.</p>
-    </section>
+      <main class="run">
+        <section class="panel">
+          <div class="row spread">
+            <h2>Stages</h2>
+            <span id="run-id" class="muted"></span>
+          </div>
+          <div id="stages" class="pipeline"></div>
+          <p class="hint">Click a stage to inspect what it was handed and what it produced.</p>
+        </section>
 
-    <section class="panel" id="metrics-panel" hidden>
-      <h2>Metrics</h2>
-      <dl id="metrics"></dl>
-      <dl id="metrics-greeks" class="metrics-row" hidden></dl>
-      <div id="permutation-chart" hidden></div>
-      <div id="metrics-extra"></div>
-    </section>
+        <section class="panel" id="metrics-panel" hidden>
+          <h2>Metrics</h2>
+          <dl id="metrics"></dl>
+          <dl id="metrics-greeks" class="metrics-row" hidden></dl>
+          <div id="permutation-chart" hidden></div>
+          <div id="metrics-extra"></div>
+        </section>
 
-    <section class="panel" id="context-panel" hidden>
-      <h2 id="context-title">Stage</h2>
-      <div id="context-body"></div>
-      <div class="row">
-        <button id="resume">Resume from this stage</button>
-        <label><input type="checkbox" id="debug" /> wait for a debugger</label>
-      </div>
-      <p id="debug-hint" class="hint" hidden></p>
-    </section>
+        <section class="panel" id="context-panel" hidden>
+          <h2 id="context-title">Stage</h2>
+          <div id="context-body"></div>
+          <div class="row">
+            <button id="resume">Resume from this stage</button>
+            <label><input type="checkbox" id="debug" /> wait for a debugger</label>
+          </div>
+          <p id="debug-hint" class="hint" hidden></p>
+        </section>
 
-    <section class="panel panel-term">
-      <div class="term">
-        <div class="term-bar"><span class="term-dot"></span> logs</div>
-        <div id="logs" class="term-body" role="log" aria-live="polite"></div>
-      </div>
-    </section>
+        <section class="panel panel-term">
+          <div class="term">
+            <div class="term-bar"><span class="term-dot"></span> logs</div>
+            <div id="logs" class="term-body" role="log" aria-live="polite"></div>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <script type="module" src="/js/app.js"></script>
   </body>
